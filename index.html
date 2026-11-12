@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>XML Viewer</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, Helvetica, sans-serif; background: #525659; color: #000; }
+  #bar { position: sticky; top: 0; z-index: 10; background: #323639; color: #fff; padding: 8px 16px; display: flex; gap: 10px; align-items: center; font-size: 14px; }
+  #bar .file-name { flex: 1; opacity: .85; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #bar button, #bar label.btn { background: #4a4f53; color: #fff; border: 0; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  #bar button:hover, #bar label.btn:hover { background: #5d6367; }
+  #drop { margin: 40px auto; max-width: 600px; border: 3px dashed #aaa; border-radius: 12px; padding: 60px 20px; text-align: center; color: #ddd; font-size: 18px; }
+  #drop small { display: block; margin-top: 10px; font-size: 13px; color: #aaa; }
+  body.dragging #drop, body.dragging #documents { outline: 4px dashed #8ab4f8; outline-offset: -8px; }
+  #documents { padding: 20px 0 60px; }
+  .page { background: #fff; width: 210mm; min-height: 297mm; margin: 0 auto 20px; padding: 8mm; box-shadow: 0 2px 8px rgba(0,0,0,.4); font-size: 9px; }
+  .erro { background: #fff; color: #b00020; max-width: 700px; margin: 30px auto; padding: 20px; border-radius: 6px; font-size: 14px; white-space: pre-wrap; }
+
+  /* ===== DANFE ===== */
+  .titulo-sec { font-weight: bold; font-size: 8px; margin: 5px 0 1px; text-transform: uppercase; }
+  .row { display: flex; }
+  .f { border: 1px solid #000; margin: -1px 0 0 -1px; padding: 1px 3px 2px; min-height: 22px; flex: 1; overflow: hidden; }
+  .f label { display: block; font-size: 6px; text-transform: uppercase; color: #222; }
+  .f span { display: block; font-size: 9px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .f.r span { text-align: right; }
+  .f.wrap span { white-space: normal; }
+  .grid { margin-left: 1px; margin-top: 1px; }
+  .cab { display: flex; margin-left: 1px; margin-top: 1px; }
+  .cab .emit { flex: 1.3; text-align: center; padding: 6px; }
+  .cab .emit .nm { font-size: 12px; font-weight: bold; margin-bottom: 4px; }
+  .cab .danfe { flex: .55; text-align: center; padding: 4px; }
+  .cab .danfe h1 { margin: 0; font-size: 16px; }
+  .cab .danfe .sub { font-size: 7px; }
+  .cab .danfe .es { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 7px; margin: 4px 0; text-align: left; }
+  .cab .danfe .es b { border: 1px solid #000; padding: 2px 6px; font-size: 12px; }
+  .cab .danfe .num { font-size: 10px; font-weight: bold; }
+  .cab .chave { flex: 1.4; padding: 0; display: flex; flex-direction: column; }
+  .cab .chave > div { border-bottom: 1px solid #000; padding: 2px 4px; }
+  .cab .chave > div:last-child { border-bottom: 0; flex: 1; font-size: 8px; display: flex; align-items: center; justify-content: center; text-align: center; }
+  .cab > div { border: 1px solid #000; margin: -1px 0 0 -1px; }
+  .barcode { height: 38px; display: flex; justify-content: center; align-items: stretch; padding: 3px 0; }
+  .barcode svg { height: 100%; width: 100%; }
+  .chave-num { font-size: 9px; font-weight: bold; text-align: center; letter-spacing: .5px; }
+  .canhoto { display: flex; margin-left: 1px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px dashed #000; }
+  .dups { display: flex; flex-wrap: wrap; margin-left: 1px; margin-top: 1px; }
+  .dups .f { flex: 0 0 25%; }
+  table.prod { width: 100%; border-collapse: collapse; font-size: 7px; margin-top: 1px; }
+  table.prod th, table.prod td { border: 1px solid #000; padding: 1px 2px; vertical-align: top; }
+  table.prod th { font-size: 6px; font-weight: normal; text-transform: uppercase; }
+  table.prod td.n { text-align: right; white-space: nowrap; }
+  table.prod td.c { text-align: center; }
+  .adic { display: flex; margin-left: 1px; margin-top: 1px; }
+  .adic .f { min-height: 70px; }
+  .adic .f span { white-space: pre-wrap; font-weight: normal; font-size: 7px; }
+  .tarja { text-align: center; color: #c00; font-weight: bold; font-size: 14px; margin: 4px 0; }
+
+  /* ===== Generic XML document ===== */
+  .gen { font-size: 11px; }
+  .gen h1 { font-size: 16px; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 2px solid #333; }
+  .gen h2 { font-size: 12px; margin: 14px 0 4px; padding: 3px 6px; background: #e8e8e8; border-left: 4px solid #555; }
+  .gen h3 { font-size: 11px; margin: 10px 0 4px; color: #333; }
+  .gen .bloco { margin-left: 10px; }
+  .gen .campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0; margin: 4px 0; }
+  .gen .campo { border: 1px solid #bbb; margin: -1px 0 0 -1px; padding: 2px 5px 3px; }
+  .gen .campo label { display: block; font-size: 8px; color: #555; text-transform: uppercase; }
+  .gen .campo span { font-size: 11px; word-break: break-word; }
+  .gen .campo.longo { grid-column: 1 / -1; }
+  .gen table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: 10px; }
+  .gen th, .gen td { border: 1px solid #bbb; padding: 2px 4px; text-align: left; vertical-align: top; }
+  .gen th { background: #f0f0f0; font-size: 8px; text-transform: uppercase; }
+
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { background: #fff; }
+    #bar, #drop { display: none !important; }
+    #documents { padding: 0; }
+    .page { box-shadow: none; margin: 0; width: auto; min-height: 0; }
+    .page + .page { page-break-before: always; }
+    table.prod tr, .gen tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div id="bar">
+  <span class="file-name" id="file-name">No file opened</span>
+  <label class="btn">Open XML<input type="file" id="file" accept=".xml,text/xml" multiple hidden></label>
+  <button id="print" disabled>Print / Save as PDF</button>
+</div>
+<div id="drop">Drop your XML file here<small>or click "Open XML". Nothing gets uploaded, everything runs right on your computer.</small></div>
+<div id="documents"></div>
+
+<script>
+// ---------- little helper stuff, nothing fancy ----------
+const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const getChildren = el => el ? [...el.children] : [];
+const getChildByPath = (el, ...path) => { for (const p of path) { if (!el) return null; el = getChildren(el).find(c => c.localName === p) || null; } return el; };
+const findDescendant = (el, name) => el ? el.getElementsByTagNameNS('*', name)[0] || null : null;
+const getText = el => el ? el.textContent.trim() : '';
+const v = (el, ...path) => getText(getChildByPath(el, ...path));
+
+const formatNumber = (s, d = 2) => { if (s === '' || s == null || isNaN(+s)) return s || ''; return (+s).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }); };
+const formatTaxId = s => { s = (s || '').replace(/\D/g, '');
+  if (s.length === 14) return s.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  if (s.length === 11) return s.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  return s; };
+const formatZipCode = s => (s || '').replace(/^(\d{5})(\d{3})$/, '$1-$2');
+const formatPhone = s => { s = (s || '').replace(/\D/g, ''); if (s.length === 10) return s.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3'); if (s.length === 11) return s.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3'); return s; };
+const formatDate = s => { if (!s) return ''; const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}:\d{2}))?/); return m ? `${m[3]}/${m[2]}/${m[1]}` + (m[4] ? ' ' + m[4] : '') : s; };
+const formatDateOnly = s => formatDate(s).split(' ')[0];
+const formatTime = s => { const m = (s || '').match(/T(\d{2}:\d{2}:\d{2})/); return m ? m[1] : ''; };
+const formatAccessKey = s => (s || '').replace(/(\d{4})/g, '$1 ').trim();
+
+const renderField = (label, value, extra = '', style = '') => `<div class="f ${extra}" ${style ? `style="${style}"` : ''}><label>${escapeHtml(label)}</label><span>${escapeHtml(value) || '&nbsp;'}</span></div>`;
+
+// ---------- Code 128C barcode stuff ----------
+const CODE128_PATTERNS = ["212222","222122","222221","121223","121322","131222","122213","122312","132212","221213","221312","231212","112232","122132","122231","113222","123122","123221","223211","221132","221231","213212","223112","312131","311222","321122","321221","312212","322112","322211","212123","212321","232121","111323","131123","131321","112313","132113","132311","211313","231113","231311","112133","112331","132131","113123","113321","133121","313121","211331","231131","213113","213311","213131","311123","311321","331121","312113","312311","332111","314111","221411","431111","111224","111422","121124","121421","141122","141221","112214","112412","122114","122411","142112","142211","241211","221114","413111","241112","134111","111242","121142","121241","114212","124112","124211","411212","421112","421211","212141","214121","412121","111143","111341","131141","114113","114311","411113","411311","113141","114131","311141","411131","211412","211214","211232","2331112"];
+function barcode(digits) {
+  if (!/^\d+$/.test(digits) || digits.length % 2) return '';
+  const codes = [105]; for (let i = 0; i < digits.length; i += 2) codes.push(+digits.substr(i, 2));
+  let sum = 105; for (let i = 1; i < codes.length; i++) sum += codes[i] * i;
+  codes.push(sum % 103, 106);
+  let x = 10, rects = '';
+  for (const c of codes) { const p = CODE128_PATTERNS[c]; for (let i = 0; i < p.length; i++) { const w = +p[i]; if (i % 2 === 0) rects += `<rect x="${x}" y="0" width="${w}" height="40"/>`; x += w; } }
+  return `<svg viewBox="0 0 ${x + 10} 40" preserveAspectRatio="none">${rects}</svg>`;
+}
+
+// ---------- DANFE rendering (Brazilian e-invoice models 55/65) ----------
+function renderDanfe(xml, inf) {
+  const ide = getChildByPath(inf, 'ide'), emit = getChildByPath(inf, 'emit'), dest = getChildByPath(inf, 'dest');
+  const ee = getChildByPath(emit, 'enderEmit'), ed = getChildByPath(dest, 'enderDest');
+  const tot = getChildByPath(inf, 'total', 'ICMSTot'), transp = getChildByPath(inf, 'transp'), cobr = getChildByPath(inf, 'cobr');
+  const prot = findDescendant(xml, 'infProt');
+  const chave = (inf.getAttribute('Id') || '').replace(/^NFe/, '') || v(prot, 'chNFe');
+  const tpAmb = v(ide, 'tpAmb');
+  const cStat = v(prot, 'cStat');
+
+  const issuerAddress = [v(ee,'xLgr') + (v(ee,'nro') ? ', ' + v(ee,'nro') : ''), v(ee,'xCpl'), v(ee,'xBairro')].filter(Boolean).join(' - ');
+  const issuerCity = `${v(ee,'xMun')} - ${v(ee,'UF')}  ZIP code ${formatZipCode(v(ee,'CEP'))}`;
+
+  let h = `<div class="page">`;
+  if (tpAmb === '2') h += `<div class="tarja">TEST ENVIRONMENT — NO TAX VALUE</div>`;
+  if (!prot) h += `<div class="tarja">INVOICE WITHOUT AUTHORIZATION PROTOCOL</div>`;
+  else if (cStat && !['100','150'].includes(cStat)) h += `<div class="tarja">${escapeHtml(cStat)} - ${escapeHtml(v(prot,'xMotivo'))}</div>`;
+
+  // receipt stub goes here
+  h += `<div class="canhoto">
+    ${renderField('Received from ' + v(emit,'xNome') + ' the goods/services listed on the invoice shown beside this field', '', 'wrap', 'flex:4')}
+    ${renderField('NF-e', 'No. ' + v(ide,'nNF') + '  Series ' + v(ide,'serie'), '', 'flex:1')}
+  </div>`;
+
+  // main header stuff
+  h += `<div class="cab">
+    <div class="emit"><div class="nm">${escapeHtml(v(emit,'xNome'))}</div>
+      <div>${escapeHtml(issuerAddress)}</div><div>${escapeHtml(issuerCity)}</div>
+      <div>${v(ee,'fone') ? 'Phone: ' + escapeHtml(formatPhone(v(ee,'fone'))) : ''}</div></div>
+    <div class="danfe"><h1>DANFE</h1><div class="sub">Auxiliary Document for Electronic Invoice</div>
+      <div class="es"><div>0 - INBOUND<br>1 - OUTBOUND</div><b>${escapeHtml(v(ide,'tpNF'))}</b></div>
+      <div class="num">No. ${escapeHtml(v(ide,'nNF').padStart(9,'0').replace(/(\d{3})(\d{3})(\d{3})/,'$1.$2.$3'))}</div>
+      <div class="num">SERIES ${escapeHtml(v(ide,'serie'))}</div><div class="sub">Model ${escapeHtml(v(ide,'mod'))}</div></div>
+    <div class="chave">
+      <div class="barcode">${barcode(chave)}</div>
+      <div><label style="font-size:6px">ACCESS KEY</label><div class="chave-num">${escapeHtml(formatAccessKey(chave))}</div></div>
+      <div>Check authenticity on the national e-invoice portal<br>www.nfe.fazenda.gov.br/portal or your state tax authority website</div>
+    </div>
+  </div>`;
+  h += `<div class="row grid">
+    ${renderField('Operation type', v(ide,'natOp'), '', 'flex:2')}
+    ${renderField('Usage authorization protocol', prot ? v(prot,'nProt') + '  ' + formatDate(v(prot,'dhRecbto')) : '', '', 'flex:1.4')}
+  </div>
+  <div class="row grid">
+    ${renderField('State registration', v(emit,'IE'))}
+    ${renderField('Tax substitute state registration', v(emit,'IEST'))}
+    ${renderField('CNPJ / CPF', formatTaxId(v(emit,'CNPJ') || v(emit,'CPF')))}
+  </div>`;
+
+  // customer / recipient details
+  if (dest) {
+    h += `<div class="titulo-sec">Recipient / Sender</div>
+    <div class="row grid">
+      ${renderField('Name / Company name', v(dest,'xNome'), '', 'flex:3')}
+      ${renderField('CNPJ / CPF', formatTaxId(v(dest,'CNPJ') || v(dest,'CPF') || v(dest,'idEstrangeiro')), '', 'flex:1.3')}
+      ${renderField('Issue date', formatDateOnly(v(ide,'dhEmi') || v(ide,'dEmi')))}
+    </div>
+    <div class="row grid">
+      ${renderField('Address', [v(ed,'xLgr') + (v(ed,'nro') ? ', ' + v(ed,'nro') : ''), v(ed,'xCpl')].filter(Boolean).join(' - '), '', 'flex:2.4')}
+      ${renderField('District / Neighborhood', v(ed,'xBairro'), '', 'flex:1.2')}
+      ${renderField('ZIP code', formatZipCode(v(ed,'CEP')), '', 'flex:.7')}
+      ${renderField('Dispatch/arrival date', formatDateOnly(v(ide,'dhSaiEnt') || v(ide,'dSaiEnt')))}
+    </div>
+    <div class="row grid">
+      ${renderField('City', v(ed,'xMun'), '', 'flex:2')}
+      ${renderField('State', v(ed,'UF'), '', 'flex:.3')}
+      ${renderField('Phone / Fax', formatPhone(v(ed,'formatPhone')), '', 'flex:1')}
+      ${renderField('State registration', v(dest,'IE'), '', 'flex:1')}
+      ${renderField('Dispatch/arrival time', formatTime(v(ide,'dhSaiEnt')))}
+    </div>`;
+  }
+
+  // invoice installments, if there are any
+  const dups = cobr ? getChildren(cobr).filter(e => e.localName === 'dup') : [];
+  const fat = getChildByPath(cobr, 'fat');
+  if (fat || dups.length) {
+    h += `<div class="titulo-sec">Invoice / Installments</div>`;
+    if (fat) h += `<div class="row grid">${renderField('Number', v(fat,'nFat'))}${renderField('Original amount', formatNumber(v(fat,'vOrig')), 'r')}${renderField('Discount', formatNumber(v(fat,'vDesc')), 'r')}${renderField('Net amount', formatNumber(v(fat,'vLiq')), 'r')}</div>`;
+    if (dups.length) h += `<div class="dups">${dups.map(d => renderField('Dup. ' + v(d,'nDup'), formatDateOnly(v(d,'dVenc')) + '   R$ ' + formatNumber(v(d,'vDup')))).join('')}</div>`;
+  }
+
+  // tax numbers. lots of them.
+  h += `<div class="titulo-sec">Tax calculation</div>
+  <div class="row grid">
+    ${renderField('ICMS tax base', formatNumber(v(tot,'vBC')), 'r')}
+    ${renderField('ICMS amount', formatNumber(v(tot,'vICMS')), 'r')}
+    ${renderField('ICMS ST tax base', formatNumber(v(tot,'vBCST')), 'r')}
+    ${renderField('ICMS ST amount', formatNumber(v(tot,'vST')), 'r')}
+    ${renderField('Import tax amount', formatNumber(v(tot,'vII')), 'r')}
+    ${renderField('PIS amount', formatNumber(v(tot,'vPIS')), 'r')}
+    ${renderField('Total product amount', formatNumber(v(tot,'vProd')), 'r')}
+  </div>
+  <div class="row grid">
+    ${renderField('Shipping amount', formatNumber(v(tot,'vFrete')), 'r')}
+    ${renderField('Insurance amount', formatNumber(v(tot,'vSeg')), 'r')}
+    ${renderField('Discount', formatNumber(v(tot,'vDesc')), 'r')}
+    ${renderField('Other expenses', formatNumber(v(tot,'vOutro')), 'r')}
+    ${renderField('Total IPI amount', formatNumber(v(tot,'vIPI')), 'r')}
+    ${renderField('COFINS amount', formatNumber(v(tot,'vCOFINS')), 'r')}
+    ${renderField('Invoice total', formatNumber(v(tot,'vNF')), 'r')}
+  </div>`;
+
+  // shipping and carrier info
+  if (transp) {
+    const t = getChildByPath(transp,'transporta'), vei = getChildByPath(transp,'veicTransp'), vol = getChildByPath(transp,'vol');
+    const mod = { '0':'0-Issuer','1':'1-Recipient','2':'2-Third parties','3':'3-Own sender','4':'4-Own recipient','9':'9-No freight' }[v(transp,'modFrete')] || v(transp,'modFrete');
+    h += `<div class="titulo-sec">Carrier / Shipped packages</div>
+    <div class="row grid">
+      ${renderField('Name / Company name', v(t,'xNome'), '', 'flex:2.5')}
+      ${renderField('Freight paid by', mod, '', 'flex:1.1')}
+      ${renderField('ANTT code', v(vei,'RNTC'))}
+      ${renderField('Vehicle plate', v(vei,'placa'))}
+      ${renderField('State', v(vei,'UF'), '', 'flex:.3')}
+      ${renderField('CNPJ / CPF', formatTaxId(v(t,'CNPJ') || v(t,'CPF')), '', 'flex:1.3')}
+    </div>
+    <div class="row grid">
+      ${renderField('Address', v(t,'xEnder'), '', 'flex:2.5')}
+      ${renderField('City', v(t,'xMun'), '', 'flex:1.6')}
+      ${renderField('State', v(t,'UF'), '', 'flex:.3')}
+      ${renderField('State registration', v(t,'IE'), '', 'flex:1.3')}
+    </div>
+    <div class="row grid">
+      ${renderField('Quantity', v(vol,'qVol'))}${renderField('Type', v(vol,'esp'))}${renderField('Brand', v(vol,'marca'))}${renderField('Numbering', v(vol,'nVol'))}
+      ${renderField('Gross weight', formatNumber(v(vol,'pesoB'),3), 'r')}${renderField('Net weight', formatNumber(v(vol,'pesoL'),3), 'r')}
+    </div>`;
+  }
+
+  // product rows
+  const dets = getChildren(inf).filter(e => e.localName === 'det');
+  h += `<div class="titulo-sec">Product / Service details</div>
+  <table class="prod"><thead><tr>
+    <th>Code</th><th>Product / Service description</th><th>NCM/SH</th><th>CST/ CSOSN</th><th>CFOP</th><th>UN</th>
+    <th>Qty.</th><th>Unit price</th><th>Total amount</th><th>ICMS tax base</th><th>ICMS amount</th><th>IPI amount</th><th>ICMS rate</th><th>IPI rate</th>
+  </tr></thead><tbody>`;
+  for (const d of dets) {
+    const p = getChildByPath(d,'prod'), imp = getChildByPath(d,'imposto');
+    const icms = getChildren(getChildByPath(imp,'ICMS'))[0];
+    const ipi = getChildByPath(imp,'IPI','IPITrib');
+    const cst = icms ? (v(icms,'orig') + (v(icms,'CST') || v(icms,'CSOSN'))) : '';
+    const extra = [v(d,'infAdProd')];
+    const med = getChildByPath(p,'med'); if (med) extra.push('ANVISA: ' + v(med,'cProdANVISA'));
+    getChildren(p).filter(e => e.localName === 'rastro').forEach(r => extra.push(`Batch: ${v(r,'nLote')} Qty: ${formatNumber(v(r,'qLote'),3)} Mfg: ${formatDateOnly(v(r,'dFab'))} Exp: ${formatDateOnly(v(r,'dVal'))}`));
+    h += `<tr>
+      <td>${escapeHtml(v(p,'cProd'))}</td>
+      <td>${escapeHtml(v(p,'xProd'))}${extra.filter(Boolean).map(x => `<br><i>${escapeHtml(x)}</i>`).join('')}</td>
+      <td class="c">${escapeHtml(v(p,'NCM'))}</td><td class="c">${escapeHtml(cst)}</td><td class="c">${escapeHtml(v(p,'CFOP'))}</td><td class="c">${escapeHtml(v(p,'uCom'))}</td>
+      <td class="n">${formatNumber(v(p,'qCom'),4)}</td><td class="n">${formatNumber(v(p,'vUnCom'),4)}</td><td class="n">${formatNumber(v(p,'vProd'))}</td>
+      <td class="n">${formatNumber(v(icms,'vBC'))}</td><td class="n">${formatNumber(v(icms,'vICMS'))}</td><td class="n">${formatNumber(v(ipi,'vIPI'))}</td>
+      <td class="n">${formatNumber(v(icms,'pICMS'))}</td><td class="n">${formatNumber(v(ipi,'pIPI'))}</td>
+    </tr>`;
+  }
+  h += `</tbody></table>`;
+
+  // service tax section
+  const iss = getChildByPath(inf,'total','ISSQNtot');
+  if (iss) h += `<div class="titulo-sec">ISSQN calculation</div><div class="row grid">
+    ${renderField('Municipal registration', v(emit,'IM'))}${renderField('Total service amount', formatNumber(v(iss,'vServ')),'r')}${renderField('ISSQN tax base', formatNumber(v(iss,'vBC')),'r')}${renderField('ISSQN amount', formatNumber(v(iss,'vISS')),'r')}</div>`;
+
+  // extra notes at the bottom
+  const ad = getChildByPath(inf,'infAdic');
+  h += `<div class="titulo-sec">Additional information</div><div class="adic">
+    ${renderField('Additional notes', [v(ad,'infCpl'), v(ad,'infAdFisco')].filter(Boolean).join('\n'), '', 'flex:2')}
+    ${renderField('Reserved for tax authority', '')}
+  </div>`;
+  h += `</div>`;
+  return h;
+}
+
+// ---------- generic XML mode, since not every XML is an invoice ----------
+const humanizeName = n => n.replace(/^[a-z]+:/, '').replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, c => c.toUpperCase());
+const isLeaf = el => el.children.length === 0;
+const formatValue = s => { if (/^\d{4}-\d{2}-\d{2}(T|$)/.test(s)) return formatDate(s); return s; };
+
+function renderFields(items) {
+  if (!items.length) return '';
+  return `<div class="campos">${items.map(([k, val]) => `<div class="campo${String(val).length > 60 ? ' longo' : ''}"><label>${escapeHtml(k)}</label><span>${escapeHtml(formatValue(val))}</span></div>`).join('')}</div>`;
+}
+
+function renderTable(items) {
+  const cols = [];
+  for (const it of items) {
+    for (const a of it.attributes) if (!a.name.startsWith('xmlns') && !cols.includes('@' + a.name)) cols.push('@' + a.name);
+    for (const c of it.children) if (!cols.includes(c.localName)) cols.push(c.localName);
+  }
+  let h = `<table><thead><tr>${cols.map(c => `<th>${escapeHtml(humanizeName(c.replace('@','')))}</th>`).join('')}</tr></thead><tbody>`;
+  for (const it of items) h += `<tr>${cols.map(c => `<td>${escapeHtml(formatValue(c[0] === '@' ? (it.getAttribute(c.slice(1)) || '') : getText(getChildByPath(it, c))))}</td>`).join('')}</tr>`;
+  return h + `</tbody></table>`;
+}
+
+function renderBlock(el, level) {
+  const items = [];
+  for (const a of el.attributes) if (!a.name.startsWith('xmlns') && !a.name.startsWith('xsi:')) items.push([humanizeName(a.name), a.value]);
+  const children = getChildren(el);
+  if (!children.length && getText(el)) items.push([humanizeName(el.localName), getText(el)]);
+  let h = '';
+  const complexNodes = [];
+  for (const c of children) {
+    if (isLeaf(c) && c.attributes.length === 0) items.push([humanizeName(c.localName), getText(c)]);
+    else complexNodes.push(c);
+  }
+  h += renderFields(items);
+  // group same-name siblings so the page does not get ridiculously long
+  const processedNodes = new Set();
+  for (const c of complexNodes) {
+    if (processedNodes.has(c)) continue;
+    const siblings = complexNodes.filter(x => x.localName === c.localName);
+    siblings.forEach(x => processedNodes.add(x));
+    const simpleSiblings = siblings.every(x => getChildren(x).every(isLeaf));
+    const tag = level === 0 ? 'h2' : 'h3';
+    if (siblings.length > 1 && simpleSiblings) {
+      h += `<${tag}>${escapeHtml(humanizeName(c.localName))} (${siblings.length})</${tag}>` + renderTable(siblings);
+    } else {
+      siblings.forEach((x, i) => {
+        h += `<${tag}>${escapeHtml(humanizeName(x.localName))}${siblings.length > 1 ? ' ' + (i + 1) : ''}</${tag}><div class="bloco">${renderBlock(x, level + 1)}</div>`;
+      });
+    }
+  }
+  return h;
+}
+
+function renderGenericDocument(xml, fileName) {
+  const root = xml.documentElement;
+  // skip the digital signature, it just gets in the way
+  [...xml.getElementsByTagNameNS('*', 'Signature')].forEach(s => s.remove());
+  return `<div class="page gen"><h1>${escapeHtml(humanizeName(root.localName))} <small style="font-weight:normal;color:#777;font-size:11px">${escapeHtml(fileName)}</small></h1>${renderBlock(root, 0)}</div>`;
+}
+
+// ---------- file loading time ----------
+async function readFileText(file) {
+  const buf = await file.arrayBuffer();
+  let s = new TextDecoder('utf-8').decode(buf);
+  const m = s.slice(0, 200).match(/encoding=["']([^"']+)["']/i);
+  if (m && !/utf-?8/i.test(m[1])) { try { s = new TextDecoder(m[1]).decode(buf); } catch (e) {} }
+  return s.replace(/^﻿/, '');
+}
+
+async function openFiles(files) {
+  files = [...files].filter(f => /\.xml$/i.test(f.name) || /xml/.test(f.type));
+  if (!files.length) return;
+  const docs = document.getElementById('documents');
+  docs.innerHTML = '';
+  document.getElementById('drop').style.display = 'none';
+  document.getElementById('file-name').textContent = files.map(f => f.name).join(', ');
+  document.title = files[0].name;
+  for (const f of files) {
+    try {
+      const xml = new DOMParser().parseFromString(await readFileText(f), 'application/xml');
+      const err = xml.getElementsByTagName('parsererror')[0];
+      if (err) throw new Error('This file is not a valid XML:\n' + err.textContent);
+      const inf = findDescendant(xml, 'infNFe');
+      docs.insertAdjacentHTML('beforeend', inf ? renderDanfe(xml, inf) : renderGenericDocument(xml, f.name));
+    } catch (e) {
+      docs.insertAdjacentHTML('beforeend', `<div class="erro"><b>${escapeHtml(f.name)}</b>\n${escapeHtml(e.message)}</div>`);
+    }
+  }
+  document.getElementById('print').disabled = false;
+  window.scrollTo(0, 0);
+}
+
+document.getElementById('file').addEventListener('change', e => openFiles(e.target.files));
+document.getElementById('print').addEventListener('click', () => window.print());
+let dragCounter = 0;
+addEventListener('dragenter', e => { e.preventDefault(); dragCounter++; document.body.classList.add('dragging'); });
+addEventListener('dragleave', e => { if (--dragCounter <= 0) { dragCounter = 0; document.body.classList.remove('dragging'); } });
+addEventListener('dragover', e => e.preventDefault());
+addEventListener('drop', e => { e.preventDefault(); dragCounter = 0; document.body.classList.remove('dragging'); openFiles(e.dataTransfer.files); });
+</script>
+</body>
+</html>
